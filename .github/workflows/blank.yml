@@ -25,7 +25,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.token }}
         run: |
-          PR_EXISTS=$(gh pr list --base $DEV_BRANCH --head $TEST_BRANCH --state open --json number --jq '.[].number' | wc -l)
+          # Check if any open PR exists from test to dev
+          PR_EXISTS=$(gh pr list --base "$DEV_BRANCH" --head "$TEST_BRANCH" --state open | grep -c '^')
           echo "::set-output name=exists::$PR_EXISTS"
 
       - name: Create PR from test to dev
@@ -33,7 +34,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.token }}
         run: |
-          gh pr create --head $TEST_BRANCH --base $DEV_BRANCH --title "PR from test to dev" --body "Automatically created PR" --repo $GITHUB_REPOSITORY
+          gh pr create --head "$TEST_BRANCH" --base "$DEV_BRANCH" --title "PR from test to dev" --body "Automatically created PR" --repo $GITHUB_REPOSITORY
 
   list-open-prs:
     name: List Open Pull Requests
@@ -48,4 +49,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.token }}
         run: |
-          gh pr list --json number,title,author --jq '.[] | "\(.number) - \(.title) by \(.author.login)"' --repo $GITHUB_REPOSITORY
+          # List all open PRs with number, title, and author login
+          gh pr list --json number,title,author --repo $GITHUB_REPOSITORY | grep -Eo '^[0-9]+ - .+ by .+'
+
