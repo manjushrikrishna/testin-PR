@@ -50,5 +50,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.token }}
         run: |
           # List all open PRs with number, title, and author login
-          gh pr list --json number,title,author --repo $GITHUB_REPOSITORY | grep -Eo '^[0-9]+ - .+ by .+'
+          gh pr list --repo $GITHUB_REPOSITORY --json number,title,author --template '{{range .}}{{.number}} - {{.title}} by {{.author.login}}{{"\n"}}{{end}}'
 
