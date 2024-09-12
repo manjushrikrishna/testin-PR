@@ -26,9 +26,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.token }}
         run: |
           # Check if any open PR exists from test to dev
-          PR_EXISTS=$(gh pr list --base "$DEV_BRANCH" --head "$TEST_BRANCH" --state open | grep -c '^')
-          echo "::set-output name=exists::$PR_EXISTS"
-
+           PR_EXISTS=$(gh pr list --base "$DEV_BRANCH" --head "$TEST_BRANCH" --state open)
+             if [ -z "$PR_EXISTS" ]; then
+                echo "No open PR found."
+                PR_COUNT=0
+            else
+              PR_COUNT=$(echo "$PR_EXISTS" | grep -c '^')
+            fi
+              echo "::set-output name=exists::$PR_COUNT"
+              
       - name: Create PR from test to dev
         if: steps.check-pr.outputs.exists == '0'
         env:
