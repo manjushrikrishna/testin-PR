@@ -40,7 +40,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.token }}
         run: |
+
           gh pr create --head "$TEST_BRANCH" --base "$DEV_BRANCH" --title "PR from test to dev" --body "Automatically created PR" --repo $GITHUB_REPOSITORY
+
+          gh pr create --head $TEST_BRANCH --base $DEV_BRANCH --title "PR from test to dev" --body "Automatically created PR" --repo $GITHUB_REPOSITORY
+
 
   list-open-prs:
     name: List Open Pull Requests
@@ -55,6 +59,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.token }}
         run: |
+
           # List all open PRs with number, title, and author login
           gh pr list --repo $GITHUB_REPOSITORY --json number,title,author --template '{{range .}}{{.number}} - {{.title}} by {{.author.login}}{{"\n"}}{{end}}'
+
+          gh pr list --json number,title,author --jq '.[] | "\(.number) - \(.title) by \(.author.login)"' --repo $GITHUB_REPOSITORY
+
+
 
