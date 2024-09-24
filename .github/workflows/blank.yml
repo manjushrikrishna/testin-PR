@@ -44,7 +44,11 @@ jobs:
             }
           }'
 
+          # Send the GraphQL request
           PR_RESPONSE=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
+
+          # Debug output
+          echo "PR Response: $PR_RESPONSE"
 
           # Check if a PR was found
           if echo "$PR_RESPONSE" | grep -q '"edges":[]'; then
