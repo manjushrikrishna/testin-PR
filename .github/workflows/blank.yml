@@ -25,7 +25,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Query to check if a PR exists from test to dev using GraphQL
+          # GraphQL query to check if a PR exists from test to dev
           QUERY='
           {
             repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
@@ -42,9 +42,8 @@ jobs:
           
           PR_RESPONSE=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
           
-          PR_COUNT=$(echo "$PR_RESPONSE" | jq '.data.repository.pullRequests.edges | length')
-          
-          if [ "$PR_COUNT" -eq 0 ]; then
+          # Check if a PR was found by searching for "edges" in the response
+          if echo "$PR_RESPONSE" | grep -q '"edges":[]'; then
             echo "No open PR found."
             echo "::set-output name=exists::false"
           else
@@ -103,5 +102,7 @@ jobs:
           
           PR_LIST=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
           
-          echo "Open PRs:"
-          echo "$PR_LIST" | jq '.data.repository.pullRequests.edges[].node | "\(.number) - \(.title) by \(.author.login)"'
+          # Simple string parsing to extract PR details from the response
+          echo "$PR_LIST" | grep -oP '"number":\s*\K\d+'
+          echo "$PR_LIST" | grep -oP '"title":\s*"\K[^"]+'
+          echo "$PR_LIST" | grep -oP '"login":\s*"\K[^"]+'
