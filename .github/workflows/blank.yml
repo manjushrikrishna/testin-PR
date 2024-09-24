@@ -16,38 +16,32 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo "GITHUB_REPOSITORY=${{ github.repository }}" >> $GITHUB_ENV
           echo "TEST_BRANCH=test" >> $GITHUB_ENV
           echo "DEV_BRANCH=dev" >> $GITHUB_ENV
 
-      - name: Check if PR exists from test to dev
+      - name: Check if branches differ
         id: check-pr
-        env:
-          GITHUB_TOKEN: ${{ secrets.token }}
         run: |
-          # Check if any open PR exists from test to dev
-           PR_EXISTS=$(gh pr list --base "$DEV_BRANCH" --head "$TEST_BRANCH" --state open)
-             if [ -z "$PR_EXISTS" ]; then
-                echo "No open PR found."
-                PR_COUNT=0
-            else
-              PR_COUNT=$(echo "$PR_EXISTS" | grep -c '^')
-            fi
-              echo "::set-output name=exists::$PR_COUNT"
-              
-      - name: Create PR from test to dev
-        if: steps.check-pr.outputs.exists == '0'
-        env:
-          GITHUB_TOKEN: ${{ secrets.token }}
+          git fetch origin
+          TEST_COMMIT=$(git rev-parse origin/$TEST_BRANCH)
+          DEV_COMMIT=$(git rev-parse origin/$DEV_BRANCH)
+
+          if [ "$TEST_COMMIT" = "$DEV_COMMIT" ]; then
+            echo "Branches are identical, no PR needed."
+            echo "::set-output name=pr_needed::false"
+          else
+            echo "Branches are different, PR needed."
+            echo "::set-output name=pr_needed::true"
+          fi
+
+      - name: Suggest creating a PR (manual step)
+        if: steps.check-pr.outputs.pr_needed == 'true'
         run: |
-
-          gh pr create --head "$TEST_BRANCH" --base "$DEV_BRANCH" --title "PR from test to dev" --body "Automatically created PR" --repo $GITHUB_REPOSITORY
-
-          gh pr create --head $TEST_BRANCH --base $DEV_BRANCH --title "PR from test to dev" --body "Automatically created PR" --repo $GITHUB_REPOSITORY
-
+          echo "Please create a PR from the '$TEST_BRANCH' to the '$DEV_BRANCH' manually."
+          echo "You can create the PR via the GitHub UI."
 
   list-open-prs:
-    name: List Open Pull Requests
+    name: List Branches (Manual PR tracking)
     needs: check-or-create-pr
     runs-on: ubuntu-latest
 
@@ -55,15 +49,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: List Open PRs
-        env:
-          GITHUB_TOKEN: ${{ secrets.token }}
+      - name: List branches for tracking
         run: |
-
-          # List all open PRs with number, title, and author login
-          gh pr list --repo $GITHUB_REPOSITORY --json number,title,author --template '{{range .}}{{.number}} - {{.title}} by {{.author.login}}{{"\n"}}{{end}}'
-
-          gh pr list --json number,title,author --jq '.[] | "\(.number) - \(.title) by \(.author.login)"' --repo $GITHUB_REPOSITORY
-
-
-
+          echo "Here are the remote branches:"
+          git branch -r
