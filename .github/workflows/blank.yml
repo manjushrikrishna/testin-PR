@@ -60,14 +60,15 @@ jobs:
           }'
 
           PR_RESPONSE=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
-          
+
           echo "PR Response: $PR_RESPONSE"  # Debugging output
 
+          # Check if a PR was found for the specified branches
           if echo "$PR_RESPONSE" | grep -q '"edges":[]'; then
-            echo "No open PR found."
+            echo "No open PR found from test to dev."
             echo "::set-output name=exists::false"
           else
-            echo "Open PR found."
+            echo "Open PR found from test to dev."
             echo "::set-output name=exists::true"
           fi
 
