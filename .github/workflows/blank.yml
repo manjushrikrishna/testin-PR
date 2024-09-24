@@ -29,6 +29,7 @@ jobs:
           REPO_OWNER: ${{ env.REPO_OWNER }}
           REPO_NAME: ${{ env.REPO_NAME }}
         run: |
+          # GraphQL query to check if a PR exists from test to dev
           QUERY='
           {
             repository(owner: "'${{ env.REPO_OWNER }}'", name: "'${{ env.REPO_NAME }}'") {
@@ -36,6 +37,7 @@ jobs:
                 edges {
                   node {
                     id
+                    title
                   }
                 }
               }
@@ -60,7 +62,8 @@ jobs:
           REPO_OWNER: ${{ env.REPO_OWNER }}
           REPO_NAME: ${{ env.REPO_NAME }}
         run: |
-          QUERY='
+          # Mutation to create a new pull request using GraphQL
+          MUTATION='
           mutation {
             createPullRequest(input: {repositoryId: "'$(echo ${{ secrets.TOKEN }} | cut -d'/' -f1)'", headRefName: "'${{ env.TEST_BRANCH }}'", baseRefName: "'${{ env.DEV_BRANCH }}'", title: "PR from test to dev", body: "Automatically created PR"}) {
               pullRequest {
@@ -70,7 +73,7 @@ jobs:
             }
           }'
 
-          CREATE_PR_RESPONSE=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
+          CREATE_PR_RESPONSE=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$MUTATION\"}" https://api.github.com/graphql)
 
           # Check for errors in response
           if echo "$CREATE_PR_RESPONSE" | grep -q '"errors":'; then
