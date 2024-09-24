@@ -16,32 +16,62 @@ jobs:
 
       - name: Set environment variables
         run: |
+          echo "GITHUB_REPOSITORY=${{ github.repository }}" >> $GITHUB_ENV
           echo "TEST_BRANCH=test" >> $GITHUB_ENV
           echo "DEV_BRANCH=dev" >> $GITHUB_ENV
 
-      - name: Check if branches differ
+      - name: Check if PR exists from test to dev using GraphQL
         id: check-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch origin
-          TEST_COMMIT=$(git rev-parse origin/$TEST_BRANCH)
-          DEV_COMMIT=$(git rev-parse origin/$DEV_BRANCH)
-
-          if [ "$TEST_COMMIT" = "$DEV_COMMIT" ]; then
-            echo "Branches are identical, no PR needed."
-            echo "::set-output name=pr_needed::false"
+          # Query to check if a PR exists from test to dev using GraphQL
+          QUERY='
+          {
+            repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+              pullRequests(states: OPEN, baseRefName: "dev", headRefName: "test", first: 1) {
+                edges {
+                  node {
+                    id
+                    title
+                  }
+                }
+              }
+            }
+          }'
+          
+          PR_RESPONSE=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
+          
+          PR_COUNT=$(echo "$PR_RESPONSE" | jq '.data.repository.pullRequests.edges | length')
+          
+          if [ "$PR_COUNT" -eq 0 ]; then
+            echo "No open PR found."
+            echo "::set-output name=exists::false"
           else
-            echo "Branches are different, PR needed."
-            echo "::set-output name=pr_needed::true"
+            echo "Open PR found."
+            echo "::set-output name=exists::true"
           fi
 
-      - name: Suggest creating a PR (manual step)
-        if: steps.check-pr.outputs.pr_needed == 'true'
+      - name: Create PR from test to dev using GraphQL
+        if: steps.check-pr.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Please create a PR from the '$TEST_BRANCH' to the '$DEV_BRANCH' manually."
-          echo "You can create the PR via the GitHub UI."
+          # Mutation to create a new pull request using GraphQL
+          MUTATION='
+          mutation {
+            createPullRequest(input: {repositoryId: "${{ github.event.repository.node_id }}", headRefName: "test", baseRefName: "dev", title: "PR from test to dev", body: "Automatically created PR"}) {
+              pullRequest {
+                id
+                title
+              }
+            }
+          }'
+          
+          curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$MUTATION\"}" https://api.github.com/graphql
 
   list-open-prs:
-    name: List Branches (Manual PR tracking)
+    name: List Open Pull Requests
     needs: check-or-create-pr
     runs-on: ubuntu-latest
 
@@ -49,7 +79,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: List branches for tracking
+      - name: List Open PRs using GraphQL
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Here are the remote branches:"
-          git branch -r
+          # Query to list all open PRs using GraphQL
+          QUERY='
+          {
+            repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+              pullRequests(states: OPEN, first: 10) {
+                edges {
+                  node {
+                    number
+                    title
+                    author {
+                      login
+                    }
+                  }
+                }
+              }
+            }
+          }'
+          
+          PR_LIST=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
+          
+          echo "Open PRs:"
+          echo "$PR_LIST" | jq '.data.repository.pullRequests.edges[].node | "\(.number) - \(.title) by \(.author.login)"'
