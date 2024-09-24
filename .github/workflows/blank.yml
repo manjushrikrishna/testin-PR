@@ -17,18 +17,36 @@ jobs:
       - name: Set environment variables
         run: |
           echo "GITHUB_REPOSITORY=${{ github.repository }}" >> $GITHUB_ENV
+          echo "REPO_OWNER=$(echo ${{ github.repository }} | cut -d'/' -f1)" >> $GITHUB_ENV
+          echo "REPO_NAME=$(echo ${{ github.repository }} | cut -d'/' -f2)" >> $GITHUB_ENV
           echo "TEST_BRANCH=test" >> $GITHUB_ENV
           echo "DEV_BRANCH=dev" >> $GITHUB_ENV
+
+      - name: Fetch repository ID using GraphQL
+        id: get-repo-id
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        run: |
+          QUERY='
+          {
+            repository(owner: "${REPO_OWNER}", name: "${REPO_NAME}") {
+              id
+            }
+          }'
+          
+          REPO_ID=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql | sed -n 's/.*"id":"\([^"]*\).*/\1/p')
+          echo "REPO_ID=$REPO_ID" >> $GITHUB_ENV
 
       - name: Check if PR exists from test to dev using GraphQL
         id: check-pr
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          REPO_OWNER: ${{ env.REPO_OWNER }}
+          REPO_NAME: ${{ env.REPO_NAME }}
         run: |
-          # GraphQL query to check if a PR exists from test to dev
           QUERY='
           {
-            repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+            repository(owner: "${REPO_OWNER}", name: "${REPO_NAME}") {
               pullRequests(states: OPEN, baseRefName: "dev", headRefName: "test", first: 1) {
                 edges {
                   node {
@@ -39,10 +57,9 @@ jobs:
               }
             }
           }'
-          
+
           PR_RESPONSE=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
           
-          # Check if a PR was found by searching for "edges" in the response
           if echo "$PR_RESPONSE" | grep -q '"edges":[]'; then
             echo "No open PR found."
             echo "::set-output name=exists::false"
@@ -55,11 +72,11 @@ jobs:
         if: steps.check-pr.outputs.exists == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          REPO_ID: ${{ env.REPO_ID }}
         run: |
-          # Mutation to create a new pull request using GraphQL
           MUTATION='
           mutation {
-            createPullRequest(input: {repositoryId: "${{ github.event.repository.node_id }}", headRefName: "test", baseRefName: "dev", title: "PR from test to dev", body: "Automatically created PR"}) {
+            createPullRequest(input: {repositoryId: "${REPO_ID}", headRefName: "test", baseRefName: "dev", title: "PR from test to dev", body: "Automatically created PR"}) {
               pullRequest {
                 id
                 title
@@ -68,5 +85,3 @@ jobs:
           }'
           
           curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$MUTATION\"}" https://api.github.com/graphql
-
-  
