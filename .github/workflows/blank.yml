@@ -23,7 +23,7 @@ jobs:
       - name: Check if PR exists from test to dev
         id: check-pr
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.token }}
         run: |
           # GraphQL query to check if a PR exists from test to dev
           QUERY='
@@ -54,7 +54,7 @@ jobs:
       - name: Create PR from test to dev
         if: env.exists == 'false'
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.token }}
         run: |
           # Mutation to create a new pull request using GraphQL
           MUTATION='
@@ -68,3 +68,39 @@ jobs:
           }'
           
           curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$MUTATION\"}" https://api.github.com/graphql
+
+  list-open-prs:
+    name: List Open Pull Requests
+    needs: check-or-create-pr
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: List Open PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.token }}
+        run: |
+          # GraphQL query to list all open PRs
+          QUERY='
+          {
+            repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+              pullRequests(states: OPEN, first: 10) {
+                edges {
+                  node {
+                    number
+                    title
+                    author {
+                      login
+                    }
+                  }
+                }
+              }
+            }
+          }'
+          
+          PR_RESPONSE=$(curl -s -H "Authorization: bearer $GITHUB_TOKEN" -X POST -d "{\"query\":\"$QUERY\"}" https://api.github.com/graphql)
+
+          # Extract and print PR details
+          echo "$PR_RESPONSE" | jq -r '.data.repository.pullRequests.edges[] | "\(.node.number) - \(.node.title) by \(.node.author.login)"'
