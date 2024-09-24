@@ -23,7 +23,7 @@ jobs:
       - name: Check if PR exists from test to dev using GraphQL
         id: check-pr
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
           # GraphQL query to check if a PR exists from test to dev
           QUERY='
@@ -54,7 +54,7 @@ jobs:
       - name: Create PR from test to dev using GraphQL
         if: steps.check-pr.outputs.exists == 'false'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
           # Mutation to create a new pull request using GraphQL
           MUTATION='
@@ -80,7 +80,7 @@ jobs:
 
       - name: List Open PRs using GraphQL
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
           # Query to list all open PRs using GraphQL
           QUERY='
