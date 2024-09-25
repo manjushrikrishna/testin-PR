@@ -55,24 +55,4 @@ jobs:
             -d '{"title": "PR from test to dev", "head": "'"$TEST_BRANCH"'", "base": "'"$DEV_BRANCH"'", "body": "Automatically created PR"}' \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls"
 
-  list-open-prs:
-    name: List Open Pull Requests
-    needs: check-or-create-pr
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: List Open PRs
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
-        run: |
-          # List all open PRs with number, title, and author login using GitHub API
-          PRS=$(curl -s \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls?state=open")
-
-          # Parse and display the number, title, and author of each PR
-          echo "$PRS" | jq -r '.[] | "\(.number) - \(.title) by \(.user.login)"'
+ 
